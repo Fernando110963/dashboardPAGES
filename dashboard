@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard Moderno de Usuários</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg-color: #f5f7fa;
+      --text-color: #2e2e2e;
+      --primary-orange: #FF6B00;
+      --primary-blue: #007BFF;
+      --card-white: #ffffff;
+      --gray-light: #e0e0e0;
+    }
+
+    body.dark-mode {
+      --bg-color: #121212;
+      --text-color: #f5f5f5;
+      --card-white: #1e1e1e;
+      --gray-light: #444;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Poppins', sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      padding: 30px 20px;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 30px;
+      font-weight: 600;
+      color: var(--primary-blue);
+    }
+
+    #toggle-mode {
+      position: absolute;
+      top: 20px;
+      right: 30px;
+      padding: 8px 14px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      background-color: var(--primary-orange);
+      color: #fff;
+    }
+
+    #stats, #charts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      justify-content: center;
+      margin-bottom: 30px;
+    }
+
+    .stat-card, .chart-card {
+      background-color: var(--card-white);
+      border-radius: 12px;
+      padding: 20px;
+      width: 280px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.05);
+      transition: transform 0.2s;
+    }
+
+    .stat-card:hover, .chart-card:hover {
+      transform: translateY(-5px);
+    }
+
+    .stat-card h3, .chart-card h3 {
+      font-size: 16px;
+      margin-bottom: 10px;
+      color: var(--text-color);
+    }
+
+    .stat-card p,
+    .stat-card ul {
+      font-size: 14px;
+    }
+
+    .stat-card ul {
+      list-style: none;
+      padding-left: 0;
+    }
+
+    #search {
+      display: block;
+      margin: 0 auto 30px;
+      padding: 12px 16px;
+      width: 60%;
+      font-size: 16px;
+      border-radius: 8px;
+      border: 1px solid var(--gray-light);
+      outline-color: var(--primary-orange);
+    }
+
+    #user-container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 20px;
+    }
+
+    .user-card {
+      background-color: var(--card-white);
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+      padding: 20px;
+      width: 260px;
+      transition: transform 0.2s ease;
+    }
+
+    .user-card:hover {
+      transform: translateY(-6px);
+    }
+
+    .user-card h4 {
+      color: var(--primary-orange);
+      font-size: 18px;
+      margin-bottom: 8px;
+    }
+
+    .user-card p {
+      font-size: 14px;
+      margin: 6px 0;
+      color: #555;
+    }
+
+    canvas {
+      width: 100% !important;
+      height: 200px !important;
+    }
+  </style>
+</head>
+<body>
+
+<button id="toggle-mode">🌙 Modo Escuro</button>
+
+<h1>Dashboard Moderno de Usuários</h1>
+
+<div id="stats">
+  <div class="stat-card" id="total-users">
+    <h3>Total de Usuários</h3>
+    <p>Carregando...</p>
+  </div>
+  <div class="stat-card" id="user-names">
+    <h3>Nomes dos Usuários</h3>
+    <ul></ul>
+  </div>
+  <div class="stat-card" id="top-cities">
+    <h3>Cidades Mais Cadastradas</h3>
+    <ul></ul>
+  </div>
+  <div class="stat-card" id="top-domains">
+    <h3>Domínios Mais Usados</h3>
+    <ul></ul>
+  </div>
+</div>
+
+<div id="charts">
+  <div class="chart-card">
+    <h3>Usuários por Empresa</h3>
+    <canvas id="barChart"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3>Domínios de Email</h3>
+    <canvas id="emailChart"></canvas>
+  </div>
+</div>
+
+<input type="text" id="search" placeholder="🔍 Buscar por nome ou cidade...">
+
+<div id="user-container"></div>
+
+<script>
+  const API_URL = 'https://jsonplaceholder.typicode.com/users';
+  const container = document.getElementById('user-container');
+  const searchInput = document.getElementById('search');
+
+  const totalUsersCard = document.getElementById('total-users');
+  const userNamesCard = document.getElementById('user-names').querySelector('ul');
+  const topCitiesCard = document.getElementById('top-cities').querySelector('ul');
+  const topDomainsCard = document.getElementById('top-domains').querySelector('ul');
+
+  const toggleModeBtn = document.getElementById('toggle-mode');
+  toggleModeBtn.addEventListener('click', () => {
+    document.body.classList.toggle('dark-mode');
+  });
+
+  let users = [];
+
+  async function fetchUsers() {
+    const res = await fetch(API_URL);
+    users = await res.json();
+    renderUsers(users);
+    renderStats(users);
+    renderCharts(users);
+  }
+
+  function renderUsers(list) {
+    container.innerHTML = '';
+    list.forEach(user => {
+      const card = document.createElement('div');
+      card.className = 'user-card';
+      card.innerHTML = `
+        <h4>${user.name}</h4>
+        <p><strong>Usuário:</strong> ${user.username}</p>
+        <p><strong>Email:</strong> ${user.email}</p>
+        <p><strong>Cidade:</strong> ${user.address.city}</p>
+        <p><strong>Empresa:</strong> ${user.company.name}</p>
+      `;
+      container.appendChild(card);
+    });
+  }
+
+  function renderStats(data) {
+    totalUsersCard.querySelector('p').textContent = `${data.length} usuários cadastrados`;
+
+    userNamesCard.innerHTML = '';
+    data.forEach(user => {
+      const li = document.createElement('li');
+      li.textContent = user.name;
+      userNamesCard.appendChild(li);
+    });
+
+    const cityCounts = {};
+    data.forEach(u => {
+      const city = u.address.city;
+      cityCounts[city] = (cityCounts[city] || 0) + 1;
+    });
+
+    const sortedCities = Object.entries(cityCounts).sort((a, b) => b[1] - a[1]);
+    topCitiesCard.innerHTML = '';
+    sortedCities.slice(0, 3).forEach(([city, count]) => {
+      const li = document.createElement('li');
+      li.textContent = `${city} (${count})`;
+      topCitiesCard.appendChild(li);
+    });
+
+    const domainCounts = {};
+    data.forEach(u => {
+      const domain = u.email.split('@')[1];
+      domainCounts[domain] = (domainCounts[domain] || 0) + 1;
+    });
+
+    const sortedDomains = Object.entries(domainCounts).sort((a, b) => b[1] - a[1]);
+    topDomainsCard.innerHTML = '';
+    sortedDomains.slice(0, 3).forEach(([domain, count]) => {
+      const li = document.createElement('li');
+      li.textContent = `${domain} (${count})`;
+      topDomainsCard.appendChild(li);
+    });
+  }
+
+  function renderCharts(data) {
+    const ctx1 = document.getElementById('barChart').getContext('2d');
+    const ctx2 = document.getElementById('emailChart').getContext('2d');
+
+    const companyData = {};
+    data.forEach(user => {
+      const company = user.company.name;
+      companyData[company] = (companyData[company] || 0) + 1;
+    });
+
+    const emailDomains = {};
+    data.forEach(user => {
+      const domain = user.email.split('@')[1];
+      emailDomains[domain] = (emailDomains[domain] || 0) + 1;
+    });
+
+    new Chart(ctx1, {
+      type: 'bar',
+      data: {
+        labels: Object.keys(companyData),
+        datasets: [{
+          label: 'Usuários',
+          data: Object.values(companyData),
+          backgroundColor: '#007BFF'
+        }]
+      },
+      options: {
+        plugins: { legend: { display: false } },
+        responsive: true,
+        maintainAspectRatio: false
+      }
+    });
+
+    new Chart(ctx2, {
+      type: 'doughnut',
+      data: {
+        labels: Object.keys(emailDomains),
+        datasets: [{
+          data: Object.values(emailDomains),
+          backgroundColor: [
+            '#FF6B00', '#007BFF', '#28a745', '#6f42c1', '#20c997', '#6610f2', '#fd7e14'
+          ]
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false
+      }
+    });
+  }
+
+  searchInput.addEventListener('input', () => {
+    const term = searchInput.value.toLowerCase();
+    const filtered = users.filter(u =>
+      u.name.toLowerCase().includes(term) ||
+      u.address.city.toLowerCase().includes(term)
+    );
+    renderUsers(filtered);
+  });
+
+  fetchUsers();
+</script>
+
+</body>
+</html>
